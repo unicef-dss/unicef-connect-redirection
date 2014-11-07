@@ -3,7 +3,7 @@
 Plugin Name: Redirection
 Plugin URI: http://urbangiraffe.com/plugins/redirection/
 Description: Manage all your 301 redirects and monitor 404 errors
-Version: 2.3.7
+Version: 2.3.8
 Author: John Godley
 Author URI: http://urbangiraffe.com
 ============================================================================================================
@@ -47,7 +47,6 @@ class Redirection extends Redirection_Plugin {
 			add_filter( 'set-screen-option', array( $this, 'set_per_page' ), 10, 3 );
 			add_action( 'redirection_log_delete', array( $this, 'expire_logs' ) );
 
-			$this->register_activation( __FILE__ );
 			$this->register_plugin_settings( __FILE__ );
 
 			add_action( 'wp_ajax_red_log_delete', array( &$this, 'ajax_log_delete' ) );
@@ -417,7 +416,7 @@ class Redirection extends Redirection_Plugin {
 
 	public function ajax_log_delete()	{
 		if ( check_ajax_referer( 'redirection-items' ) ) {
-			if ( preg_match_all( '/=(\d*)/', $this->post['checked'], $items ) > 0) {
+			if ( preg_match_all( '/=(\d*)/', $_POST['checked'], $items ) > 0) {
 				foreach ( $items[1] AS $item ) {
 					RE_Log::delete( intval( $item ) );
 				}
@@ -494,7 +493,7 @@ class Redirection extends Redirection_Plugin {
 
 		$group = Red_Group::get( $group_id );
 		if ( $group ) {
-			$group->update( $this->post );
+			$group->update( $_POST );
 
 			$pager = new Redirection_Group_Table( array(), false );
 			$json = array( 'html' => $pager->column_name( $group ) );
@@ -550,7 +549,7 @@ class Redirection extends Redirection_Plugin {
 
 		$this->check_ajax_referer( 'redirection-redirect_add' );
 
-		$item = Red_Item::create( $this->post );
+		$item = Red_Item::create( $_POST );
 		if ( is_wp_error( $item ) )
 			$json['error'] = $item->get_error_message();
 		elseif ( $item !== false ) {
