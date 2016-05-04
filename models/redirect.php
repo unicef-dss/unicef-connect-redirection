@@ -18,20 +18,28 @@ class Red_Item {
 	private $position;
 	private $group_id;
 
-	function Red_Item( $values, $type = '', $match = '' )	{
+	function __construct( $values, $type = '', $match = '' )	{
 		if ( is_object( $values ) ) {
-			foreach ( $values AS $key => $value ) {
+			foreach ( $values as $key => $value ) {
 			 	$this->$key = $value;
 			}
 
-			if ( $this->match_type ) {
-				$this->match              = Red_Match::create( $this->match_type, $this->action_data);
-				$this->match->id          = $this->id;
-				$this->match->action_code = $this->action_code;
+			if ( $this->match_type === '' ) {
+				$this->match_type = 'url';
 			}
 
-			if ( $this->action_type )	{
-				$this->action        = Red_Action::create( $this->action_type, $this->action_code);
+			$this->match              = Red_Match::create( $this->match_type, $this->action_data );
+			$this->match->id          = $this->id;
+			$this->match->action_code = $this->action_code;
+
+			$action = false;
+
+			if ( $this->action_type ) {
+				$action = Red_Action::create( $this->action_type, $this->action_code );
+			}
+
+			if ( $action ) {
+				$this->action = $action;
 				$this->match->action = $this->action;
 			}
 			else
@@ -40,7 +48,7 @@ class Red_Item {
 			if ( $this->last_access == '0000-00-00 00:00:00' )
 				$this->last_access = 0;
 			else
-				$this->last_access = mysql2date( 'U', $this->last_access);
+				$this->last_access = mysql2date( 'U', $this->last_access );
 		}
 		else {
 			$this->url   = $values;
@@ -76,14 +84,28 @@ class Red_Item {
 		$items = array();
 		if ( count( $rows ) > 0 ) {
 			foreach ( $rows AS $row ) {
-				$items[$row->group_pos * 1000 + $row->position] = new Red_Item( $row );
+				$items[] = array( 'position' => ( $row->group_pos * 1000 ) + $row->position, 'item' => new Red_Item( $row ) );
 			}
 		}
+
+		usort( $items, array( 'Red_Item', 'sort_urls' ) );
+		$items = array_map( array( 'Red_Item', 'reduce_sorted_items' ), $items );
 
 		// Sort it in PHP
 		ksort( $items );
 		$items = array_values( $items );
 		return $items;
+	}
+
+	static function sort_urls( $first, $second ) {
+		if ( $first['position'] === $second['position'] )
+			return 0;
+
+		return $first['position'] < $second['position'];
+	}
+
+	static function reduce_sorted_items( $item ) {
+		return $item['item'];
 	}
 
 	static function get_by_module( $module ) {
@@ -276,7 +298,7 @@ class Red_Item {
 
 				$this->visit( $url, $target );
 
-				if ( $this->status == 'enabled' )
+				if ( $this->status === 'enabled' )
 					return $this->action->process_before( $this->action_code, $target );
 			}
 		}
@@ -314,12 +336,12 @@ class Red_Item {
 
 			$options = red_get_options();
 			if ( isset( $options['expire_redirect'] ) && $options['expire_redirect'] >= 0 )
-				$log = RE_Log::create( $url, $target, $_SERVER['HTTP_USER_AGENT'], $ip, isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '', array( 'redirect_id' => $this->id, 'module_id' => $this->module_id, 'group_id' => $this->group_id) );
+				$log = RE_Log::create( $url, $target, $_SERVER['HTTP_USER_AGENT'], $ip, isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '', array( 'redirect_id' => $this->id, 'group_id' => $this->group_id) );
 		}
 	}
 
 	public function is_enabled() {
-		return $this->status == 'enabled';
+		return $this->status === 'enabled';
 	}
 
 	function reset() {
@@ -346,14 +368,14 @@ class Red_Item {
 	public function enable() {
 		global $wpdb;
 
-		$this->status = true;
+		$this->status = 'enabled';
 		$wpdb->update( $wpdb->prefix.'redirection_items', array( 'status' => $this->status ), array( 'id' => $this->id ) );
 	}
 
 	public function disable() {
 		global $wpdb;
 
-		$this->status = false;
+		$this->status = 'disabled';
 		$wpdb->update( $wpdb->prefix.'redirection_items', array( 'status' => $this->status ), array( 'id' => $this->id ) );
 	}
 
